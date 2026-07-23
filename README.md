@@ -3,6 +3,12 @@
 A full-stack enterprise platform that combines Project Management, Team Collaboration, CRM Pipeline, and AI-powered Insights into a single workspace. Built with React and Spring Boot.
 
 ---
+## 🔗 Live Demo
+
+**🌐 View the live project:**  
+[**https://wastewizard.vercel.app/**](https://crm-taskflow.vercel.app/)
+
+---
 
 ## Architecture Overview
 
