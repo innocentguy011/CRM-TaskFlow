@@ -7,8 +7,14 @@ services:
     runtime: docker
     plan: free
     region: singapore
-    rootDir: crm-backend
-    dockerfilePath: ./Dockerfile
+    # Paths from the repo root (no rootDir), so they resolve the same however
+    # Render interprets dockerfilePath/dockerContext.
+    dockerfilePath: ./crm-backend/Dockerfile
+    dockerContext: ./crm-backend
+    # Only backend changes trigger a backend deploy
+    buildFilter:
+      paths:
+        - crm-backend/**
     branch: main
     autoDeploy: true
     healthCheckPath: /actuator/health
