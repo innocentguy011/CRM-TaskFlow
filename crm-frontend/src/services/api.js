@@ -117,4 +117,13 @@ api.interceptors.response.use(
   }
 )
 
+/**
+ * Resolves a backend-relative path (e.g. /api/files/{id}) to an absolute URL on
+ * the API host, so links and <img> tags do not hit the frontend's own domain.
+ */
+export const resolveApiUrl = (path) => {
+  if (!path || /^(https?:|data:|blob:)/.test(path)) return path
+  return `${import.meta.env.VITE_API_URL || ''}${path}`
+}
+
 export default api

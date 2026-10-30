@@ -71,8 +71,8 @@ const MessageInput = ({ onSendMessage, onTyping, roomId, disabled = false }) => 
         toast.error(`${f.name}: unsupported file type`)
         return false
       }
-      if (f.size > 20 * 1024 * 1024) {
-        toast.error(`${f.name}: exceeds 20 MB limit`)
+      if (f.size > 10 * 1024 * 1024) {
+        toast.error(`${f.name}: exceeds 10 MB limit`)
         return false
       }
       return true

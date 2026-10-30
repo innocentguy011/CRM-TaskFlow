@@ -9,6 +9,7 @@ import com.arjun.crm.exception.ResourceNotFoundException;
 import com.arjun.crm.repository.TaskAttachmentRepository;
 import com.arjun.crm.repository.TaskRepository;
 import com.arjun.crm.repository.UserRepository;
+import com.arjun.crm.service.FileStorageService;
 import com.arjun.crm.service.TaskAttachmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,13 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,9 +32,7 @@ public class TaskAttachmentServiceImpl implements TaskAttachmentService {
     private final TaskAttachmentRepository taskAttachmentRepository;
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
-
-    @Value("${file.upload.dir:uploads/task-attachments}")
-    private String uploadDir;
+    private final FileStorageService fileStorageService;
 
     @Value("${file.upload.max-size:10485760}") // 10MB default
     private long maxFileSize;
@@ -62,43 +55,23 @@ public class TaskAttachmentServiceImpl implements TaskAttachmentService {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found with ID: " + taskId));
 
-        try {
-            // Create upload directory if not exists
-            Path uploadPath = Paths.get(uploadDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+        String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
+        String fileUrl = fileStorageService.store(file, currentUser.getId());
 
-            // Generate unique filename
-            String originalFilename = file.getOriginalFilename();
-            String fileExtension = originalFilename != null && originalFilename.contains(".") 
-                    ? originalFilename.substring(originalFilename.lastIndexOf(".")) 
-                    : "";
-            String uniqueFilename = UUID.randomUUID().toString() + fileExtension;
+        // Create attachment entity
+        TaskAttachment attachment = TaskAttachment.builder()
+                .task(task)
+                .uploadedBy(currentUser)
+                .fileName(originalFilename)
+                .fileUrl(fileUrl)
+                .fileType(file.getContentType())
+                .fileSize(file.getSize())
+                .build();
 
-            // Save file to disk
-            Path filePath = uploadPath.resolve(uniqueFilename);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        TaskAttachment savedAttachment = taskAttachmentRepository.save(attachment);
+        log.info("Attachment uploaded successfully: {}", savedAttachment.getId());
 
-            // Create attachment entity
-            TaskAttachment attachment = TaskAttachment.builder()
-                    .task(task)
-                    .uploadedBy(currentUser)
-                    .fileName(originalFilename)
-                    .fileUrl("/uploads/task-attachments/" + uniqueFilename)
-                    .fileType(file.getContentType())
-                    .fileSize(file.getSize())
-                    .build();
-
-            TaskAttachment savedAttachment = taskAttachmentRepository.save(attachment);
-            log.info("Attachment uploaded successfully: {}", savedAttachment.getId());
-
-            return TaskAttachmentResponse.fromEntity(savedAttachment);
-
-        } catch (IOException e) {
-            log.error("Failed to upload file", e);
-            throw new RuntimeException("Failed to upload file: " + e.getMessage());
-        }
+        return TaskAttachmentResponse.fromEntity(savedAttachment);
     }
 
     @Override
@@ -120,19 +93,8 @@ public class TaskAttachmentServiceImpl implements TaskAttachmentService {
             throw new AccessDeniedException("You can only delete your own attachments");
         }
 
-        // Delete file from disk
-        try {
-            String fileUrl = attachment.getFileUrl();
-            String filename = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-            Path filePath = Paths.get(uploadDir).resolve(filename);
-            Files.deleteIfExists(filePath);
-            log.info("File deleted from disk: {}", filename);
-        } catch (IOException e) {
-            log.error("Failed to delete file from disk", e);
-            // Continue with database deletion even if file deletion fails
-        }
-
         taskAttachmentRepository.delete(attachment);
+        fileStorageService.deleteByUrl(attachment.getFileUrl());
         log.info("Attachment deleted successfully: {}", attachmentId);
     }
 
