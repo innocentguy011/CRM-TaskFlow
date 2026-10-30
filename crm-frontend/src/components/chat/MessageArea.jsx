@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { format, isToday, isYesterday, isSameDay } from 'date-fns'
 import { useSelector } from 'react-redux'
 import { FiEdit2, FiCheck, FiChevronUp } from 'react-icons/fi'
+import { resolveApiUrl } from '../../services/api'
 
 const MessageArea = ({
   messages,
@@ -139,9 +140,9 @@ const MessageArea = ({
                     >
                       {/* Image attachment */}
                       {msg.messageType === 'IMAGE' && msg.attachmentUrl && (
-                        <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={resolveApiUrl(msg.attachmentUrl)} target="_blank" rel="noopener noreferrer">
                           <img
-                            src={msg.attachmentUrl}
+                            src={resolveApiUrl(msg.attachmentUrl)}
                             alt={msg.attachmentName || 'image'}
                             className="max-w-xs sm:max-w-sm md:max-w-md max-h-64 rounded-lg mb-2 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                           />
@@ -151,7 +152,7 @@ const MessageArea = ({
                       {/* File attachment (non-image) */}
                       {msg.messageType === 'FILE' && msg.attachmentUrl && (
                         <a
-                          href={msg.attachmentUrl}
+                          href={resolveApiUrl(msg.attachmentUrl)}
                           download={msg.attachmentName}
                           target="_blank"
                           rel="noopener noreferrer"

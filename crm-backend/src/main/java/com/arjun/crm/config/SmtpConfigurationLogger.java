@@ -255,9 +255,6 @@ public class SmtpConfigurationLogger {
         if (password == null || password.equals("NOT_SET") || password.equals("nopassword")) {
             return password;
         }
-        if (password.length() > 6) {
-            return password.substring(0, 3) + "***" + password.substring(password.length() - 3);
-        }
-        return "***" + password.substring(Math.max(0, password.length() - 3));
+        return "****";
     }
 }

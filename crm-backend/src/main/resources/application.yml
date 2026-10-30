@@ -24,12 +24,12 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID:placeholder}
             client-secret: ${GOOGLE_CLIENT_SECRET:placeholder}
             scope: openid,profile,email
-            redirect-uri: "${OAUTH2_REDIRECT_URI_GOOGLE:https://crm-taskflow-production.up.railway.app/login/oauth2/code/google}"
+            redirect-uri: "${OAUTH2_REDIRECT_URI_GOOGLE:{baseUrl}/login/oauth2/code/google}"
           github:
             client-id: ${GITHUB_CLIENT_ID:placeholder}
             client-secret: ${GITHUB_CLIENT_SECRET:placeholder}
             scope: read:user,user:email
-            redirect-uri: "${OAUTH2_REDIRECT_URI_GITHUB:https://crm-taskflow-production.up.railway.app/login/oauth2/code/github}"
+            redirect-uri: "${OAUTH2_REDIRECT_URI_GITHUB:{baseUrl}/login/oauth2/code/github}"
         provider:
           google:
             authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
@@ -49,7 +49,7 @@ spring:
   # Database Configuration (PostgreSQL)
   # ─────────────────────────────────────────────────────────────────────────
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://db.xkzpzcvwzqjavftrnxjl.supabase.co:5432/postgres?sslmode=require}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/crm_db}
     username: ${DATABASE_USERNAME:postgres}
     password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -86,6 +86,10 @@ spring:
   # ─────────────────────────────────────────────────────────────────────────
   data:
     redis:
+      # SPRING_DATA_REDIS_URL (e.g. rediss://default:<password>@<host>:6379 for Upstash)
+      # overrides host/port/password; also set REDIS_SSL=true for rediss://
+      repositories:
+        enabled: false
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
@@ -196,7 +200,7 @@ spring:
 # Server Configuration
 # ───────────────────────────────────────────────────────────────────────────
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${SERVER_PORT:${PORT:8080}}
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
@@ -227,7 +231,7 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
-    name: ${LOG_FILE:logs/crm-backend.log}
+    name: ${LOG_FILE:}
     max-size: 10MB
     max-history: 30
     total-size-cap: 1GB
@@ -252,7 +256,7 @@ management:
         enabled: true
   health:
     redis:
-      enabled: true
+      enabled: ${redis.enabled}
     db:
       enabled: true
     mail:
@@ -292,9 +296,10 @@ file:
 # ───────────────────────────────────────────────────────────────────────────
 ai:
   xai:
-    api-key: ${XAI_API_KEY:}
-    model: ${XAI_MODEL:grok-4.20-reasoning}
-    base-url: ${XAI_BASE_URL:https://api.x.ai/v1/chat/completions}
+    # Any OpenAI-compatible chat completions API; defaults to Groq
+    api-key: ${GROQ_API_KEY:${XAI_API_KEY:}}
+    model: ${AI_MODEL:llama-3.3-70b-versatile}
+    base-url: ${AI_BASE_URL:https://api.groq.com/openai/v1/chat/completions}
     temperature: ${AI_TEMPERATURE:0.7}
     max-tokens: ${AI_MAX_TOKENS:1000}
     timeout: ${AI_TIMEOUT:30000}  # 30 seconds
@@ -362,15 +367,25 @@ springdoc:
 # Email Configuration (Brevo HTTP API)
 # ───────────────────────────────────────────────────────────────────────────
 app:
+  seed:
+    # Seeds demo users/workspaces into an empty database (password from DEMO_SEED_PASSWORD)
+    enabled: ${DEMO_SEED_ENABLED:false}
+    password: ${DEMO_SEED_PASSWORD:}
   mail:
-    from: ${APP_MAIL_FROM:xsde790@gmail.com}
+    from: ${APP_MAIL_FROM:noreply@example.com}
     from-name: ${APP_MAIL_FROM_NAME:TaskFlow}
   invitation-base-url: ${INVITATION_BASE_URL:http://localhost:3000/invitations}
   oauth2-frontend-failure-url: ${OAUTH2_FRONTEND_FAILURE_URL:http://localhost:3000/login?error=oauth2_failed}
 
 # ───────────────────────────────────────────────────────────────────────────
+# Redis toggle: true = Redis cache + presence, false = in-memory fallbacks
+# ───────────────────────────────────────────────────────────────────────────
+redis:
+  enabled: ${REDIS_ENABLED:false}
+
+# ───────────────────────────────────────────────────────────────────────────
 # Brevo Configuration
 # ───────────────────────────────────────────────────────────────────────────
 brevo:
-  api-key: ${BREVO_API_KEY}
+  api-key: ${BREVO_API_KEY:}
   api-url: https://api.brevo.com/v3/smtp/email

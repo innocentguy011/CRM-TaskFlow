@@ -104,6 +104,9 @@ redis:
   enabled: true
 
 app:
+  seed:
+    enabled: ${DEMO_SEED_ENABLED:true}
+    password: ${DEMO_SEED_PASSWORD:password123}
   mail:
     from: ${MAIL_USERNAME:noemail@example.com}
     from-name: "TaskFlow"

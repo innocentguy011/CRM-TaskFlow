@@ -6,6 +6,7 @@ import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,6 +31,7 @@ import java.time.LocalDateTime;
  * @version 1.0
  */
 @RestController
+@Profile("dev")
 @RequestMapping("/api/test")
 @RequiredArgsConstructor
 @Slf4j

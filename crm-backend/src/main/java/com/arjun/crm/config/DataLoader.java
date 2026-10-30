@@ -11,7 +11,9 @@ import com.arjun.crm.repository.WorkspaceRepository;
 import com.arjun.crm.repository.WorkspaceMemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,10 +24,18 @@ import java.util.HashSet;
  * Initializes test data when the application starts.
  * This allows frontend to test login, workspaces, and other features
  * without having to manually register users first.
+ *
+ * Controlled by app.seed.enabled (DEMO_SEED_ENABLED). The seeded password comes
+ * from app.seed.password (DEMO_SEED_PASSWORD); seeding is skipped when it is blank.
+ * Seeded users never get the global ADMIN role, since their credentials may be public.
  */
 @Configuration
 @Slf4j
+@ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true")
 public class DataLoader {
+
+    @Value("${app.seed.password:}")
+    private String seedPassword;
 
     @Bean
     public CommandLineRunner loadData(
@@ -44,12 +54,19 @@ public class DataLoader {
                 return;
             }
 
+            if (seedPassword == null || seedPassword.isBlank()) {
+                log.warn("app.seed.password (DEMO_SEED_PASSWORD) is not set, skipping test data");
+                return;
+            }
+
             try {
+                String encodedPassword = passwordEncoder.encode(seedPassword);
+
                 // Create test users
                 User testUser1 = User.builder()
                         .fullName("Test User One")
                         .email("test1@example.com")
-                        .password(passwordEncoder.encode("password123"))
+                        .password(encodedPassword)
                         .role(Role.USER)
                         .status(UserStatus.ACTIVE)
                         .build();
@@ -57,7 +74,7 @@ public class DataLoader {
                 User testUser2 = User.builder()
                         .fullName("Test User Two")
                         .email("test2@example.com")
-                        .password(passwordEncoder.encode("password123"))
+                        .password(encodedPassword)
                         .role(Role.USER)
                         .status(UserStatus.ACTIVE)
                         .build();
@@ -65,8 +82,8 @@ public class DataLoader {
                 User adminUser = User.builder()
                         .fullName("Admin User")
                         .email("admin@example.com")
-                        .password(passwordEncoder.encode("password123"))
-                        .role(Role.ADMIN)
+                        .password(encodedPassword)
+                        .role(Role.USER)
                         .status(UserStatus.ACTIVE)
                         .build();
 
@@ -74,10 +91,7 @@ public class DataLoader {
                 testUser2 = userRepository.save(testUser2);
                 adminUser = userRepository.save(adminUser);
 
-                log.info("✓ Created test users:");
-                log.info("  - test1@example.com / password123");
-                log.info("  - test2@example.com / password123");
-                log.info("  - admin@example.com / password123");
+                log.info("✓ Created test users: test1@example.com, test2@example.com, admin@example.com");
 
                 // Create test workspaces
                 Workspace workspace1 = Workspace.builder()
@@ -134,9 +148,7 @@ public class DataLoader {
                 log.info("═══════════════════════════════════════════════════════════════");
                 log.info("  ✓ TEST DATA INITIALIZATION COMPLETE");
                 log.info("═══════════════════════════════════════════════════════════════");
-                log.info("  You can now login with:");
-                log.info("    Email: test1@example.com");
-                log.info("    Password: password123");
+                log.info("  You can now login with test1@example.com and DEMO_SEED_PASSWORD");
                 log.info("═══════════════════════════════════════════════════════════════");
 
             } catch (Exception e) {

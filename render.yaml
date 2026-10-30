@@ -1,0 +1,60 @@
+# Render Blueprint for the Spring Boot backend (free web service, Docker).
+# PostgreSQL (Neon) and Redis (Upstash) are external; their connection values
+# are entered in the Render dashboard (sync: false = never stored in this file).
+services:
+  - type: web
+    name: crm-taskflow-api
+    runtime: docker
+    plan: free
+    region: singapore
+    # Paths from the repo root (no rootDir), so they resolve the same however
+    # Render interprets dockerfilePath/dockerContext.
+    dockerfilePath: ./crm-backend/Dockerfile
+    dockerContext: ./crm-backend
+    # Only backend changes trigger a backend deploy
+    buildFilter:
+      paths:
+        - crm-backend/**
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      # Fit Spring Boot into the 512 MB / 0.1 CPU free instance
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=65 -XX:+UseSerialGC -Xss512k -XX:ReservedCodeCacheSize=48m -XX:TieredStopAtLevel=1
+      - key: JWT_SECRET
+        generateValue: true
+      # PostgreSQL (JDBC URL, e.g. jdbc:postgresql://<host>/neondb?sslmode=require)
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      # Redis (Upstash rediss:// URL)
+      - key: REDIS_ENABLED
+        value: "true"
+      - key: REDIS_SSL
+        value: "true"
+      - key: SPRING_DATA_REDIS_URL
+        sync: false
+      # AI
+      - key: GROQ_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: llama-3.3-70b-versatile
+      # Vercel URL, e.g. https://crm-taskflow-xyz.vercel.app
+      - key: FRONTEND_URL
+        sync: false
+      # Demo accounts for the public demo (non-admin)
+      - key: DEMO_SEED_ENABLED
+        value: "true"
+      - key: DEMO_SEED_PASSWORD
+        sync: false
+      # Optional: email invitations via Brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: APP_MAIL_FROM
+        sync: false

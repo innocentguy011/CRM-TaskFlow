@@ -2,11 +2,19 @@
 # Optimized Multi-stage Dockerfile for CRM Backend (Railway-friendly)
 # ═══════════════════════════════════════════════════════════════════════════
 
+# Registry for the official Docker Library base images. All of these serve the
+# same images (identical digests); only the source and its rate limits differ:
+#   mirror.gcr.io/library        Google's Docker Hub cache (default)
+#   docker.io/library            Docker Hub (anonymous: ~10 pulls/hour per IP)
+#   public.ecr.aws/docker/library  AWS ECR Public (anonymous data cap; returned
+#                                  429 "Data limit exceeded" on shared CI runners)
+# Override with: docker build --build-arg BASE_REGISTRY=docker.io/library ...
+ARG BASE_REGISTRY=mirror.gcr.io/library
+
 # ───────────────────────────────────────────────────────────────────────────
 # Stage 1: Build with dependency caching
 # ───────────────────────────────────────────────────────────────────────────
-# Using public.ecr.aws registry as fallback for better Railway connectivity
-FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-21-alpine AS build
+FROM ${BASE_REGISTRY}/maven:3.9-eclipse-temurin-21-alpine AS build
 
 WORKDIR /app
 
@@ -26,8 +34,7 @@ RUN mvn clean package -DskipTests -q
 # ───────────────────────────────────────────────────────────────────────────
 # Stage 2: Runtime
 # ───────────────────────────────────────────────────────────────────────────
-# Using public.ecr.aws registry for better Railway connectivity
-FROM public.ecr.aws/docker/library/eclipse-temurin:21-jre-alpine
+FROM ${BASE_REGISTRY}/eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
@@ -48,8 +55,8 @@ COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=120s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider "http://localhost:${PORT:-8080}/actuator/health" || exit 1
 
 # Run application — defaults to prod profile; override via SPRING_PROFILES_ACTIVE env var
 ENTRYPOINT ["java", \

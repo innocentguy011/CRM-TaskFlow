@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +25,22 @@ public class JwtService {
 
     @Value("${jwt.expiration}")
     private long jwtExpiration;
+
+    /**
+     * HMAC signing key. JWT_SECRET may be base64 (decoding to at least 256 bits)
+     * or a plain string of at least 32 characters.
+     */
+    private SecretKey getSigningKey() {
+        try {
+            byte[] decoded = Decoders.BASE64.decode(secretKey);
+            if (decoded.length >= 32) {
+                return Keys.hmacShaKeyFor(decoded);
+            }
+        } catch (RuntimeException ignored) {
+            // not base64: fall through to the raw string
+        }
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+    }
 
     /**
      * Extract username (email) from JWT token
@@ -77,7 +95,7 @@ public class JwtService {
                 .subject(userDetails.getUsername())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey)))
+                .signWith(getSigningKey())
                 .compact();
     }
 
@@ -108,7 +126,7 @@ public class JwtService {
      */
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey)))
+                .verifyWith(getSigningKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();

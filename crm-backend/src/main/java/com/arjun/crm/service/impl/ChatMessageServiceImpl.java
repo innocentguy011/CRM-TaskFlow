@@ -19,9 +19,9 @@ import com.arjun.crm.repository.BlockedUserRepository;
 import com.arjun.crm.service.ChatMessageService;
 import com.arjun.crm.service.NotificationService;
 import com.arjun.crm.service.CacheEvictionService;
+import com.arjun.crm.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,13 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -54,9 +48,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final SimpMessagingTemplate messagingTemplate;
     private final BlockedUserRepository blockedUserRepository;
     private final CacheEvictionService cacheEvictionService;
-
-    @Value("${file.upload.dir:uploads/task-attachments}")
-    private String uploadDir;
+    private final FileStorageService fileStorageService;
 
     private static final Set<String> ALLOWED_TYPES = Set.of(
             "application/pdf",
@@ -120,7 +112,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         log.info("Uploading file to chat room {} by user {}", chatRoomId, currentUser.getEmail());
 
         if (file.isEmpty()) throw new IllegalArgumentException("File is empty");
-        if (file.getSize() > 20L * 1024 * 1024) throw new IllegalArgumentException("File exceeds 20 MB limit");
+        if (file.getSize() > 10L * 1024 * 1024) throw new IllegalArgumentException("File exceeds 10 MB limit");
 
         String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
         if (!ALLOWED_TYPES.contains(contentType)) {
@@ -134,46 +126,29 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             throw new AccessDeniedException("You are not a participant of this chat room");
         }
 
-        String chatUploadDir = uploadDir + "/chat";
-        try {
-            Path uploadPath = Paths.get(chatUploadDir);
-            if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
+        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
+        String fileUrl = fileStorageService.store(file, currentUser.getId());
+        MessageType msgType = contentType.startsWith("image/") ? MessageType.IMAGE : MessageType.FILE;
 
-            String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
-            String ext = originalName.contains(".")
-                    ? originalName.substring(originalName.lastIndexOf("."))
-                    : "";
-            String storedName = UUID.randomUUID() + ext;
+        ChatMessage message = ChatMessage.builder()
+                .chatRoom(chatRoom)
+                .sender(currentUser)
+                .content(originalName)
+                .messageType(msgType)
+                .attachmentUrl(fileUrl)
+                .attachmentName(originalName)
+                .attachmentType(contentType)
+                .attachmentSize(file.getSize())
+                .build();
 
-            Files.copy(file.getInputStream(), uploadPath.resolve(storedName), StandardCopyOption.REPLACE_EXISTING);
+        ChatMessage saved = chatMessageRepository.save(message);
+        ChatMessageResponse response = ChatMessageResponse.fromEntity(saved);
 
-            String fileUrl = "/api/uploads/chat/" + storedName;
-            MessageType msgType = contentType.startsWith("image/") ? MessageType.IMAGE : MessageType.FILE;
+        messagingTemplate.convertAndSend("/topic/chat/" + chatRoomId, response);
+        notifyParticipants(chatRoom, currentUser, "📎 " + originalName);
 
-            ChatMessage message = ChatMessage.builder()
-                    .chatRoom(chatRoom)
-                    .sender(currentUser)
-                    .content(originalName)
-                    .messageType(msgType)
-                    .attachmentUrl(fileUrl)
-                    .attachmentName(originalName)
-                    .attachmentType(contentType)
-                    .attachmentSize(file.getSize())
-                    .build();
-
-            ChatMessage saved = chatMessageRepository.save(message);
-            ChatMessageResponse response = ChatMessageResponse.fromEntity(saved);
-
-            messagingTemplate.convertAndSend("/topic/chat/" + chatRoomId, response);
-            notifyParticipants(chatRoom, currentUser, "📎 " + originalName);
-
-            log.info("File message saved: {} -> {}", originalName, fileUrl);
-            return response;
-
-        } catch (IOException e) {
-            log.error("Failed to save chat file", e);
-            throw new RuntimeException("Failed to upload file: " + e.getMessage());
-        }
+        log.info("File message saved: {} -> {}", originalName, fileUrl);
+        return response;
     }
 
     @Override

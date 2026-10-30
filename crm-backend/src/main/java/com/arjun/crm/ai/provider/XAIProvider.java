@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -19,7 +19,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * xAI (Grok) Provider for AI-powered features
+ * AI provider for any OpenAI-compatible chat completions API
+ * (Groq by default; xAI or OpenAI work by changing ai.xai.base-url and model).
  */
 @Component
 @RequiredArgsConstructor
@@ -38,59 +39,87 @@ public class XAIProvider {
     @Value("${ai.xai.base-url}")
     private String baseUrl;
 
+    @Value("${ai.xai.retry.max-attempts:3}")
+    private int maxAttempts;
+
+    @Value("${ai.xai.retry.backoff-delay:1000}")
+    private long backoffDelay;
+
     /**
      * Generate AI response (delegates to generateResponseNoCache — caching is
      * handled at the service layer, not here, to avoid Redis type-cast issues).
      */
-    @Retryable(
-        value = {Exception.class},
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2)
-    )
     public AIResponse generateResponse(String prompt) {
         return generateResponseNoCache(prompt);
     }
 
     /**
-     * Generate AI response without caching (for dynamic content)
+     * Generate AI response without caching (for dynamic content).
+     * Retries rate limits (429), server errors (5xx) and network errors with
+     * exponential backoff, then falls back to a "temporarily unavailable" response.
      */
-    @Retryable(
-        value = {Exception.class},
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000, multiplier = 2)
-    )
     public AIResponse generateResponseNoCache(String prompt) {
-        try {
-            log.info("Sending request to xAI API (no cache)");
-            
-            Map<String, Object> requestBody = buildRequestBody(prompt);
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
-            
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            ResponseEntity<String> response = restTemplate.exchange(
-                baseUrl,
-                HttpMethod.POST,
-                entity,
-                String.class
-            );
-            
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                return parseXAIResponse(response.getBody());
-            } else {
-                throw new AIServiceException("Failed to get response from xAI API: " + response.getStatusCode());
+        long delay = backoffDelay;
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return callApi(prompt);
+            } catch (HttpStatusCodeException e) {
+                boolean retryable = e.getStatusCode().value() == 429 || e.getStatusCode().is5xxServerError();
+                if (!retryable || attempt >= maxAttempts) {
+                    log.error("AI API call failed with status {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
+                    return unavailable();
+                }
+                log.warn("AI API returned {} (attempt {}/{}), retrying in {} ms", e.getStatusCode(), attempt, maxAttempts, delay);
+            } catch (ResourceAccessException e) {
+                if (attempt >= maxAttempts) {
+                    log.error("AI API unreachable: {}", e.getMessage());
+                    return unavailable();
+                }
+                log.warn("AI API unreachable (attempt {}/{}), retrying in {} ms", attempt, maxAttempts, delay);
+            } catch (Exception e) {
+                log.error("Error calling AI API: {}", e.getMessage(), e);
+                return unavailable();
             }
-            
-        } catch (Exception e) {
-            log.error("Error calling xAI API: {}", e.getMessage(), e);
-            // Graceful fallback
-            return AIResponse.builder()
-                .content("AI service is temporarily unavailable. Please try again shortly.")
-                .success(false)
-                .model(model)
-                .build();
+            try {
+                Thread.sleep(delay);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return unavailable();
+            }
+            delay *= 2;
         }
+    }
+
+    private AIResponse callApi(String prompt) {
+        log.info("Sending request to AI API (model={})", model);
+
+        Map<String, Object> requestBody = buildRequestBody(prompt);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<String> response = restTemplate.exchange(
+            baseUrl,
+            HttpMethod.POST,
+            entity,
+            String.class
+        );
+
+        if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            return parseXAIResponse(response.getBody());
+        } else {
+            throw new AIServiceException("Failed to get response from AI API: " + response.getStatusCode());
+        }
+    }
+
+    private AIResponse unavailable() {
+        // Graceful fallback
+        return AIResponse.builder()
+            .content("AI service is temporarily unavailable. Please try again shortly.")
+            .success(false)
+            .model(model)
+            .build();
     }
 
     /**

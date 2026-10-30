@@ -29,16 +29,13 @@ public class AIStartupValidator {
         if (apiKey == null || apiKey.isBlank()) {
             log.error("╔══════════════════════════════════════════════════════════╗");
             log.error("║  AI CONFIGURATION ERROR                                  ║");
-            log.error("║  XAI_API_KEY environment variable is not set.            ║");
+            log.error("║  GROQ_API_KEY environment variable is not set.           ║");
             log.error("║  AI features (chat AI, task AI, insights) will fail.     ║");
-            log.error("║  Set XAI_API_KEY in your environment or .env file.       ║");
+            log.error("║  Set GROQ_API_KEY in your environment or .env file.      ║");
             log.error("╚══════════════════════════════════════════════════════════╝");
         } else {
-            // Log only first/last 4 chars to confirm it loaded without exposing the key
-            String masked = apiKey.substring(0, Math.min(4, apiKey.length()))
-                          + "****"
-                          + apiKey.substring(Math.max(0, apiKey.length() - 4));
-            log.info("AI provider configured: model={}, url={}, key={}", model, baseUrl, masked);
+            // Log only the key length to confirm it loaded without exposing any of it
+            log.info("AI provider configured: model={}, url={}, key length={}", model, baseUrl, apiKey.length());
         }
     }
 }

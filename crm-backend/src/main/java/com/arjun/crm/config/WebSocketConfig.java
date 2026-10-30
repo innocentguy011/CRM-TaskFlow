@@ -59,7 +59,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * - http://localhost:3000,http://localhost:5173,https://taskflow-ai-ochre.vercel.app
      * - https://app.example.com,wss://app.example.com (if using WSS directly)
      */
-    @Value("${websocket.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8081,https://taskflow-ai-ochre.vercel.app}")
+    @Value("${websocket.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8081}")
     private String allowedOriginsRaw;
 
     /**
