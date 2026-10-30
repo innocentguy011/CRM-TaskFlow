@@ -15,8 +15,7 @@ import java.util.List;
  * Configures Cross-Origin Resource Sharing for the application
  *
  * Uses setAllowedOriginPatterns() to support wildcard patterns (e.g. *.vercel.app)
- * while still allowing credentials. This prevents breakage on every new Vercel
- * preview deployment URL.
+ * while still allowing credentials. Origins come only from cors.allowed-origins.
  */
 @Configuration
 public class CorsConfig {
@@ -39,23 +38,9 @@ public class CorsConfig {
                 .filter(s -> !s.isEmpty())
                 .toList();
 
-        // Add all configured origins directly (Spring handles both plain URLs and patterns)
+        // Only configured origins are allowed (Spring handles both plain URLs and patterns).
+        // Add e.g. https://*-yourteam.vercel.app to CORS_ALLOWED_ORIGINS for preview deployments.
         configuration.setAllowedOriginPatterns(configOrigins);
-        
-        // Add fixed localhost and vercel patterns
-        java.util.List<String> patterns = new java.util.ArrayList<>(configOrigins);
-        patterns.addAll(List.of(
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://localhost:3001",
-                "http://127.0.0.1:3001",
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "https://*.vercel.app"   // wildcard pattern for vercel
-        ));
-
-        // Set patterns using setAllowedOriginPatterns (supports both plain URLs and wildcards)
-        configuration.setAllowedOriginPatterns(patterns);
 
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"

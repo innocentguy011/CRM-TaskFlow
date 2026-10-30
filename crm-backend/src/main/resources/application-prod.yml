@@ -1,5 +1,8 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # Production Profile Configuration
+# All secrets and hosts come from environment variables (see crm-backend/.env.example).
+# FRONTEND_URL (e.g. https://your-app.vercel.app) drives CORS, WebSocket origins
+# and the OAuth2 / invitation redirects unless the specific variables are set.
 # ═══════════════════════════════════════════════════════════════════════════
 
 spring:
@@ -13,18 +16,15 @@ spring:
         generate_statistics: false
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://db.xkzpzcvwzqjavftrnxjl.supabase.co:5432/postgres?sslmode=require}
-    username: ${DATABASE_USERNAME:postgres}
+    # JDBC form, e.g. jdbc:postgresql://<host>/<db>?sslmode=require
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
     password: ${DATABASE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 10
-
-  # Redis auto-config: excluded only when REDIS_ENABLED=false (e.g. bare Render deploy).
-  # On AWS ECS/Docker where Redis IS available, set REDIS_ENABLED=true to skip exclusion.
-  autoconfigure:
-    exclude: ${SPRING_AUTOCONFIGURE_EXCLUDE:org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration}
+      # Small pool: free Postgres tiers and a 512 MB container
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: 1
 
 logging:
   level:
@@ -33,75 +33,50 @@ logging:
     org.springframework.web: WARN
     org.springframework.security: WARN
     org.hibernate.SQL: WARN
+  file:
+    name: ""  # console only; container filesystems are ephemeral
 
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${SERVER_PORT:${PORT:8080}}
   address: 0.0.0.0
+  # Trust X-Forwarded-* from the hosting proxy so {baseUrl} resolves to https
+  forward-headers-strategy: framework
   error:
     include-stacktrace: never
     include-exception: false
   compression:
     enabled: true
 
-# Restricted actuator endpoints in production
+# Only health and info are exposed in production
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info
   endpoint:
     health:
       show-details: when-authorized
-  health:
-    redis:
-      enabled: ${REDIS_ENABLED:false}
 
 # API Documentation disabled in production
 springdoc:
   api-docs:
-    enabled: false
+    enabled: ${API_DOCS_ENABLED:false}
   swagger-ui:
-    enabled: false
+    enabled: ${SWAGGER_UI_ENABLED:false}
 
-# Strict CORS for production — must be set via env var
+# Strict CORS for production
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:${FRONTEND_URL}}
   allow-credentials: true
 
-# Redis presence service: set REDIS_ENABLED=true when Redis is available
-redis:
-  enabled: ${REDIS_ENABLED:false}
-# Resend Email Configuration
-resend:
-  api-key: ${RESEND_API_KEY}
-  from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
-
-# OAuth2 Client Configuration - for production
-spring.security.oauth2.client.registration.google.client-id: ${GOOGLE_CLIENT_ID}
-spring.security.oauth2.client.registration.google.client-secret: ${GOOGLE_CLIENT_SECRET}
-spring.security.oauth2.client.registration.google.scope: openid,profile,email
-spring.security.oauth2.client.registration.google.redirect-uri: "${OAUTH2_REDIRECT_URI_GOOGLE:https://crm-taskflow-production.up.railway.app/login/oauth2/code/google}"
-
-spring.security.oauth2.client.registration.github.client-id: ${GITHUB_CLIENT_ID}
-spring.security.oauth2.client.registration.github.client-secret: ${GITHUB_CLIENT_SECRET}
-spring.security.oauth2.client.registration.github.scope: read:user,user:email
-spring.security.oauth2.client.registration.github.redirect-uri: "${OAUTH2_REDIRECT_URI_GITHUB:https://crm-taskflow-production.up.railway.app/login/oauth2/code/github}"
-
-spring.security.oauth2.client.provider.google.authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
-spring.security.oauth2.client.provider.google.token-uri: https://www.googleapis.com/oauth2/v4/token
-spring.security.oauth2.client.provider.google.user-info-uri: https://www.googleapis.com/oauth2/v1/userinfo
-spring.security.oauth2.client.provider.google.user-name-attribute: sub
-
-spring.security.oauth2.client.provider.github.authorization-uri: https://github.com/login/oauth/authorize
-spring.security.oauth2.client.provider.github.token-uri: https://github.com/login/oauth/access_token
-spring.security.oauth2.client.provider.github.user-info-uri: https://api.github.com/user
-spring.security.oauth2.client.provider.github.user-name-attribute: id
+websocket:
+  allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:${CORS_ALLOWED_ORIGINS:${FRONTEND_URL}}}
 
 # OAuth2 redirect after login
 oauth2:
-  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/callback}
+  redirect-uri: ${OAUTH2_REDIRECT_URI:${FRONTEND_URL}/oauth2/callback}
 
 # Application configuration
 app:
-  invitation-base-url: ${INVITATION_BASE_URL:https://crm-taskflow.vercel.app/invitations}
-  oauth2-frontend-failure-url: ${OAUTH2_FRONTEND_FAILURE_URL:https://crm-taskflow.vercel.app/login?error=oauth2_failed}
+  invitation-base-url: ${INVITATION_BASE_URL:${FRONTEND_URL}/invitations}
+  oauth2-frontend-failure-url: ${OAUTH2_FRONTEND_FAILURE_URL:${FRONTEND_URL}/login?error=oauth2_failed}
