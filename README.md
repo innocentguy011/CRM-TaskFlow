@@ -273,54 +273,6 @@ Go to http://localhost:3000/register and sign up with an email and password, or 
 
 ---
 
-## 5-Week Development Plan
-
-**Week 1 — Core Infrastructure and Authentication**
-
-Set up the project from scratch: Spring Boot with Maven, React with Vite, Docker Compose with PostgreSQL and Redis. Define the database schema for users, workspaces, projects, and tasks. Implement JWT-based authentication on the backend with a custom Spring Security filter chain set to stateless. On the frontend, build the Redux auth slice, configure the Axios interceptor to attach tokens, and create protected route guards. By end of week one the register, login, and logout flows work end to end.
-
-**Week 2 — Task Management and Kanban Board**
-
-Build the full task CRUD on the backend with workspace and project scoping. Create the Kanban board UI using dnd-kit for drag-and-drop. Implement the five task statuses and four priority levels. Add the task form with a date picker that serializes dates as yyyy-MM-dd to match Spring's LocalDate deserialization. Set up STOMP WebSocket on the backend and subscribe to project task topics on the frontend so moves appear in real time for all connected users. Add task comments, activity logs, and file attachments. Integrate Groq API for AI priority suggestions and deadline predictions.
-
-**Week 3 — CRM Pipeline and Team Chat**
-
-Build the lead entity with all pipeline stages and deal value tracking. Create the CRM board, filter panel, and analytics charts. Build the chat system: room creation, participant management, and real-time messaging over STOMP. Implement Redis-based presence tracking with per-user heartbeat keys. Add presence snapshot broadcasting on connect. Build file upload for chat attachments with type validation and 20 MB size limit. Add the block user, remove from group, and delete chat features with confirmation dialogs.
-
-**Week 4 — AI Insights and Analytics**
-
-Build the AI insights engine that queries real workspace data from the database. Implement the health score calculator with deductions for overdue tasks, stalled projects, inactive leads, and workload imbalance. Add project risk detection, team burnout analysis, and CRM follow-up alerts. Generate actionable recommendations with payloads for one-click actions. Save daily snapshots to the database for trend charts. Integrate Groq for natural language explanations with a rule-based fallback. Build the analytics dashboard with Recharts: completion rates, status distributions, team performance rankings, and the 35-day activity heatmap.
-
-**Week 5 — OAuth2, Notifications, and Production Hardening**
-
-Add Google and GitHub OAuth2 login using Spring Security OAuth2 Client. Implement dual security chains: one for OAuth2 PKCE redirects that needs a brief session, one stateless chain for all API routes. Fix session-related bugs: clear stale workspace state from localStorage on login and logout, proactive JWT expiry check in the Axios interceptor. Build the notification system with real-time WebSocket delivery and database persistence. Add the global AI Copilot with page context injection. Configure Dockerfile to pre-create upload directories with correct ownership for the non-root spring user. Create .env.example files and .gitignore rules to exclude all secrets before publishing to GitHub.
-
----
-
-## Implementation Notes
-
-**Why the backend is fully stateless**
-
-Spring Security uses STATELESS session policy for all API and WebSocket routes. No cookies, no server-side sessions. The only exception is a separate Order(1) security filter chain covering /oauth2/** and /login/oauth2/** which needs a temporary session for the OAuth2 PKCE state parameter during the redirect handshake. After the token is generated and sent to the frontend, the session is invalidated immediately.
-
-**How Redis presence works**
-
-Each connected user gets their own Redis key `chat:online:user:{id}` with a 60-second TTL. The frontend publishes a heartbeat message to `/app/chat/heartbeat` every 30 seconds to refresh it. Spring listens to `SessionConnectEvent` and `SessionDisconnectEvent` to mark users online and offline automatically, even when a browser tab is closed without an explicit disconnect message. On every connect, a full snapshot of all online user IDs is broadcast to `/topic/presence/snapshot` so newly joined users immediately see the correct presence state.
-
-**Why dates are formatted before sending**
-
-Spring's LocalDate cannot deserialize a JavaScript ISO datetime string like `2026-06-15T18:30:00.000Z`. Jackson expects `2026-06-15`. The frontend converts all JavaScript Date objects from the date picker into yyyy-MM-dd strings before sending them in the request body.
-
-**Why Docker uploads go to /tmp**
-
-The Docker container runs as a non-root `spring` user for security. The /app directory is not writable by that user. Files are uploaded to `/tmp/uploads` which is created with `chown spring:spring` in the Dockerfile before the USER directive. No named volume is mounted over that path, which would reset ownership to root.
-
-**Lombok annotation processing**
-
-The pom.xml explicitly declares Lombok in the maven-compiler-plugin annotationProcessorPaths. Without this, the Maven compiler sometimes fails to process @Builder, @Slf4j and other annotations during a clean no-cache build, producing "cannot find symbol" errors on generated methods like builder() and log.
-
----
-
 ## License
 
 MIT
