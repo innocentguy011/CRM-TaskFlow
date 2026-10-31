@@ -22,7 +22,7 @@ const TaskComments = ({ taskId }) => {
 
   // Add comment mutation
   const addCommentMutation = useMutation({
-    mutationFn: (content) => taskService.addComment(taskId, { content }),
+    mutationFn: (content) => taskService.addComment(taskId, { message: content }),
     onSuccess: () => {
       queryClient.invalidateQueries(['task-comments', taskId])
       setNewComment('')

@@ -8,8 +8,8 @@ export const taskService = {
     return unwrap(response)
   },
 
-  getById: async (id) => {
-    const response = await api.get(`/tasks/${id}`)
+  getById: async (id, workspaceId) => {
+    const response = await api.get(`/tasks/${id}`, { params: { workspaceId } })
     return unwrap(response)
   },
 
@@ -28,8 +28,8 @@ export const taskService = {
     return unwrap(response)
   },
 
-  updateStatus: async (id, status) => {
-    const response = await api.patch(`/tasks/${id}/status`, { status })
+  updateStatus: async (id, status, workspaceId) => {
+    const response = await api.patch(`/tasks/${id}/status`, { status, workspaceId })
     return unwrap(response)
   },
 

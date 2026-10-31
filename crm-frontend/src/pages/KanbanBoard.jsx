@@ -63,7 +63,7 @@ const KanbanBoard = () => {
 
   // Update task status mutation
   const updateStatusMutation = useMutation({
-    mutationFn: ({ taskId, status }) => taskService.updateStatus(taskId, status),
+    mutationFn: ({ taskId, status }) => taskService.updateStatus(taskId, status, currentWorkspace?.id),
     onMutate: async ({ taskId, status }) => {
       await queryClient.cancelQueries(['tasks', projectId])
       const previousTasks = queryClient.getQueryData(['tasks', projectId])

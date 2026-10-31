@@ -136,6 +136,19 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Resource not found"));
     }
 
+    /**
+     * Missing or malformed request parameter (e.g. ?workspaceId) — a client error, so 400 NOT 500.
+     */
+    @ExceptionHandler({
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleBadRequestParameter(Exception ex) {
+        log.warn("Bad request parameter: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);

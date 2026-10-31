@@ -103,7 +103,7 @@ const AIInsights = () => {
       if (actionType === 'REASSIGN') {
         const { taskId, assigneeId, targetUserName } = actionPayload
         // Fetch original task details
-        const taskDetails = await taskService.getById(taskId)
+        const taskDetails = await taskService.getById(taskId, currentWorkspace?.id)
         // Update task assignee
         await taskService.update(taskId, {
           title: taskDetails.title,

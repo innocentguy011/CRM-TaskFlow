@@ -46,7 +46,7 @@ const Projects = () => {
 
   // Delete project mutation
   const deleteMutation = useMutation({
-    mutationFn: projectService.delete,
+    mutationFn: (id) => projectService.delete(id, workspaceId),
     onSuccess: () => {
       queryClient.invalidateQueries(['projects', workspaceId])
       toast.success('Project deleted successfully')
