@@ -28,8 +28,8 @@ export const projectService = {
   },
 
   // Delete project
-  delete: async (id) => {
-    const response = await api.delete(`/projects/${id}`)
+  delete: async (id, workspaceId) => {
+    const response = await api.delete(`/projects/${id}`, { params: { workspaceId } })
     return unwrap(response)
   },
 

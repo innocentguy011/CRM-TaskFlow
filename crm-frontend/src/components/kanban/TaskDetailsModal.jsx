@@ -26,7 +26,7 @@ const TaskDetailsModal = ({ task, onClose, projectId, workspaceId }) => {
   // Fetch task details
   const { data: taskDetails, isLoading } = useQuery({
     queryKey: ['task', task.id],
-    queryFn: () => taskService.getById(task.id),
+    queryFn: () => taskService.getById(task.id, workspaceId),
     initialData: task,
     retry: false,
   })
