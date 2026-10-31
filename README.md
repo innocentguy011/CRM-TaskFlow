@@ -270,13 +270,3 @@ Go to http://localhost:3000/register and sign up with an email and password, or 
 | POST | /api/chat/messages/upload | Upload a file to a chat room |
 | POST | /api/chat/rooms/block/{userId} | Block a user |
 | DELETE | /api/chat/rooms/{id} | Delete a chat room |
-
----
-
-## License
-
-MIT
-
----
-
-Built by [Arjun Singh](https://github.com/Arjunsingh-7)
